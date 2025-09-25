@@ -1,0 +1,25 @@
+{
+  "name": "aws-samples-edge-origin-selection",
+  "version": "0.1.0",
+  "bin": {
+    "aws-samples-edge-origin-selection": "bin/aws-samples-edge-origin-selection.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "8.10.148",
+    "@types/node": "24.5.1",
+    "aws-cdk": "2.1029.2",
+    "esbuild": "0.25.9",
+    "ts-node": "10.9.2",
+    "typescript": "5.9.2"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.215.0",
+    "cdk-nag": "2.37.29",
+    "constructs": "10.4.2"
+  }
+}
