@@ -42,7 +42,7 @@ DNS-based routing has fundamental constraints that limit real-time control:
 - **No per-request control** - Once DNS is cached, you lose control until cache expires
 
 **Technical Limitations:**
-- **Weighted routing** - Fixed percentage splits that can't adapt to real-time conditions
+- **Weighted routing** - Fixed percentage splits that can't adapt to real-time conditions. traffic split precentage can't be ensure, as the split is during DNS resoloving and not actual requests.
 - **Latency-based** - Routes to best latency origin based on AWS measurements, but can't consider business logic or user context
 - **Health checks** - Basic up/down status with limited failover logic
 - **Geolocation** - Broad geographic regions only, no fine-grained targeting
@@ -80,7 +80,7 @@ This means:
 Edge routing provides instant, per-request control:
 
 **Immediate Propagation:**
-- **Sub-second updates** - CloudFront Function changes expect to propagate to all edge locations within seconds
+- **Second level updates** - CloudFront Function changes expect to propagate to all edge locations within seconds (best-effort)
 - **No client caching** - Routing decisions made fresh for every single request
 - **Instant failover** - Emergency routing changes expect to take effect immediately
 - **Real-time control** - Modify routing behavior without waiting for cache expiration
@@ -511,15 +511,25 @@ graph TD
 **CloudFront Computed Headers Example:**
 ```javascript
 // Access rich context automatically provided by CloudFront
-const deviceType = request.headers['cloudfront-is-mobile-viewer']?.value === 'true' ? 'mobile' :
-                  request.headers['cloudfront-is-tablet-viewer']?.value === 'true' ? 'tablet' :
-                  request.headers['cloudfront-is-desktop-viewer']?.value === 'true' ? 'desktop' :
-                  request.headers['cloudfront-is-smarttv-viewer']?.value === 'true' ? 'tv' : 'unknown';
+function getHeaderValue(headerName) {
+    return request.headers[headerName] ? request.headers[headerName].value : undefined;
+}
 
-const country = request.headers['cloudfront-viewer-country']?.value; // 'US', 'DE', 'JP', etc.
-const asn = request.headers['cloudfront-viewer-asn']?.value; // Autonomous System Number
-const protocol = request.headers['cloudfront-forwarded-proto']?.value; // 'https' or 'http'
-const language = request.headers['accept-language']?.value; // 'en-US,en;q=0.9'
+const isMobile = getHeaderValue('cloudfront-is-mobile-viewer') === 'true';
+const isTablet = getHeaderValue('cloudfront-is-tablet-viewer') === 'true';
+const isDesktop = getHeaderValue('cloudfront-is-desktop-viewer') === 'true';
+const isSmartTV = getHeaderValue('cloudfront-is-smarttv-viewer') === 'true';
+
+const deviceType = isMobile ? 'mobile' :
+                  isTablet ? 'tablet' :
+                  isDesktop ? 'desktop' :
+                  isSmartTV ? 'tv' : 'unknown';
+
+
+const country = getHeaderValue('cloudfront-viewer-country');
+const asn = getHeaderValue('cloudfront-viewer-asn');
+const protocol = getHeaderValue('cloudfront-forwarded-proto');
+const language = getHeaderValue('accept-language');
 
 // Route based on device type and geography
 let originId = '__default__';
@@ -540,6 +550,7 @@ if (asn && enterpriseASNs.includes(asn)) {
   originId = `enterprise-${originId}`;
 }
 ```
+
 
 ### A/B Testing Flow
 ```mermaid
@@ -716,14 +727,14 @@ cell-basic.example.com    300  IN  A  203.0.113.50  ; eu-central-1 (latency-base
 **Demo (Educational Only):**
 ```javascript
 // ❌ Avoid in production - too predictable
-const originId = request.headers['x-origin-id']?.value; // '0', '1', '2'
+const originId = request.headers['x-origin-id'] && request.headers['x-origin-id'].value; // '0', '1', '2', undefiend
 ```
 
 **Production (Recommended):**
 ```javascript
 // ✅ Production approach - obfuscated and secure
-const routingToken = request.headers['x-routing-token']?.value;
-const sessionHash = request.headers['x-session-hash']?.value;
+const routingToken = request.headers['x-routing-token'] && request.headers['x-routing-token'].value;
+const sessionHash = request.headers['x-session-hash'] && request.headers['x-session-hash'].value;
 
 // Use hashed/encrypted values instead of simple integers
 const originMapping = {
@@ -761,7 +772,7 @@ const validateAndRoute = async (request) => {
 
 ## Benefits of Edge-Based Session Stickiness
 
-- **Performance**: No database lookups for session routing
+- **Performance**: No database lookups for session routing. KVS lookups are being used are very low-latency
 - **Scalability**: Leverages CloudFront's global infrastructure  
 - **Simplicity**: Reduces backend complexity
 - **Reliability**: Built-in failover capabilities
